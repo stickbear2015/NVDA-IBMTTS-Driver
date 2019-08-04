@@ -7,6 +7,6 @@ import config
 # Add-on config database
 confspec = {
 	"dllName": "string(default='eci.dll')",
-	"TTSPath": "string(default='ibmtts')"
+	"TTSPath": "string(default='%appdata%\nvda\addons\ibmtts\synthDrivers\ibmtts')"
 }
 config.conf.spec["ibmeci"]=confspec
