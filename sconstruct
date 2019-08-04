@@ -70,7 +70,7 @@ if "channel" in env and env["channel"] is not None:
 	env["addon_updateChannel"] = env["channel"]
 
 <<<<<<< HEAD
-addonFile = env.File("${addon_name}-${addon_version}-broken-addon")
+addonFile = env.File("${addon_name}-${addon_version}-possibly-broken.nvda-addon")
 =======
 addonFile = env.File("${addon_name}-${addon_version}-no-dic.nvda-addon")
 >>>>>>> library-include-no-dictionaries
