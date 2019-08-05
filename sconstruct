@@ -8,7 +8,6 @@ import gettext
 import os
 import os.path
 import zipfile
-import six
 import buildVars
 
 def md2html(source, dest):
@@ -21,7 +20,7 @@ def md2html(source, dest):
 	}
 	with codecs.open(source, "r", "utf-8") as f:
 		mdText = f.read()
-		for k, v in six.iteritems(headerDic):
+		for k, v in headerDic.items():
 			mdText = mdText.replace(k, v, 1)
 		htmlText = markdown.markdown(mdText)
 	with codecs.open(dest, "w", "utf-8") as f:
@@ -69,7 +68,7 @@ elif env["version"] is not None:
 if "channel" in env and env["channel"] is not None:
 	env["addon_updateChannel"] = env["channel"]
 
-addonFile = env.File("${addon_name}-${addon_version}-with-libraries-and-no-dictionaries.nvda-addon")
+addonFile = env.File("${addon_name}-${addon_version}-no-dics.nvda-addon")
 
 def addonGenerator(target, source, env, for_signature):
 	action = env.Action(lambda target, source, env : createAddonBundleFromPath(source[0].abspath, target[0].abspath) and None,
