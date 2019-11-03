@@ -177,7 +177,7 @@ def eciCheck():
 	ttsPath =  config.conf.profiles[0]['ibmeci']['TTSPath']
 	
 	if  not path.isabs(ttsPath):
-		ttsPath = path.join(path.abspath(path.dirname(__file__)), ttsPath)
+		ttsPath = path.abspath(path.join(path.abspath(path.dirname(__file__)), ttsPath))
 		if path.exists(ttsPath): iniCheck()
 	if not path.exists(ttsPath): return False
 	if dll: return True
@@ -242,32 +242,37 @@ def bgPlay(stri):
 			tries += 1
 	log.error("Eloq speech failed to feed one buffer.")
 
-curindex=None
+indexes = []
+def sendIndexes():
+	global indexes
+	for i in indexes: _callbackExec(setLast, i)
+	indexes = []
+
+def playStream():
+	global audioStream
+	_callbackExec(bgPlay, audioStream.getvalue())
+	audioStream.truncate(0)
+	audioStream.seek(0)
+	sendIndexes()
+
+endStringReached = False
 Callback = WINFUNCTYPE(c_int, c_int, c_int, c_int, c_void_p)
 @Callback
 def callback (h, ms, lp, dt):
-	global audioStream, curindex, speaking, END_STRING_MARK, endMarkersCount
+	global audioStream, speaking, END_STRING_MARK, endMarkersCount, indexes, endStringReached
 	if speaking and ms == ECIMessage.eciWaveformBuffer:
 		audioStream.write(string_at(buffer, lp*2))
-		if audioStream.tell() >= samples*2:
-			_callbackExec(bgPlay, audioStream.getvalue())
-			if curindex is not None:
-				_callbackExec(setLast, curindex)
-				curindex=None
-			audioStream.truncate(0)
-			audioStream.seek(0)
+		if audioStream.tell() >= samples*2: playStream()
+		endStringReached = False
 	elif ms==ECIMessage.eciIndexReply:
-		if lp != END_STRING_MARK: # not end of string
-			curindex = lp
-		else: #We reached the end of string
-			if audioStream.tell() > 0:
-				_callbackExec(bgPlay, audioStream.getvalue())
-				audioStream.seek(0)
-				audioStream.truncate(0)
-			if curindex is not None:
-				_callbackExec(setLast, curindex)
-				curindex=None
+		if lp == END_STRING_MARK:
+			if audioStream.tell() > 0: playStream()
+			sendIndexes()
 			_callbackExec(endStringEvent)
+			endStringReached = True
+		else:
+			if endStringReached: _callbackExec(setLast, lp)
+			else: indexes.append(lp)
 	return ECICallbackReturn.eciDataProcessed
 
 class CallbackThread(threading.Thread):
@@ -360,6 +365,9 @@ def setVParam(pr, vl):
 	param_event.wait()
 	param_event.clear()
 
+def setProsodyParam(pr, vl):
+	dll.eciSetVoiceParam(handle, 0, pr, vl)
+
 def setVariant(v):
 	user32.PostThreadMessageA(eciThreadId, WM_COPYVOICE, v, 0)
 	param_event.wait()
@@ -390,10 +398,11 @@ def endStringEvent():
 	endMarkersCount -=1
 	if endMarkersCount == 0:
 		speaking = False
-		onDoneSpeaking()
 		idleTimer = threading.Timer(0.3, idlePlayer)
 		idleTimer.start()
 
 def idlePlayer():
 	global player, speaking
-	if not speaking: player.idle()
+	if not speaking:
+		player.idle()
+		onDoneSpeaking()
