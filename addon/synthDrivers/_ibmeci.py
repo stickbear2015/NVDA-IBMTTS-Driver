@@ -113,14 +113,14 @@ class EciThread(threading.Thread):
 		dll.eciRegisterCallback(handle, callback, None)
 		dll.eciSetOutputBuffer(handle, samples, pointer(buffer))
 		dll.eciSetParam(handle, ECIParam.eciInputType, 1)
-		dll.eciSetParam(handle, ECIParam.eciDictionary, 1) #dictionary off
+		dll.eciSetParam(handle, ECIParam.eciDictionary, 1) #dictionary on
 		self.dictionaryHandle = dll.eciNewDict(handle)
 		dll.eciSetDict(handle, self.dictionaryHandle)
 		#0 = main dictionary
-		if path.exists(path.join(ttsPath, "main.dic")):
-			dll.eciLoadDict(handle, self.dictionaryHandle, 0, path.join(ttsPath, "main.dic"))
-		if path.exists(path.join(ttsPath, "root.dic")):
-			dll.eciLoadDict(handle, self.dictionaryHandle, 1, path.join(ttsPath, "root.dic"))
+		if path.exists(path.join(path.abspath(ttsPath), "main.dic")):
+			dll.eciLoadDict(handle, self.dictionaryHandle, 0, path.join(path.abspath(ttsPath), "main.dic").encode('mbcs'))
+		if path.exists(path.join(path.abspath(ttsPath), "root.dic")):
+			dll.eciLoadDict(handle, self.dictionaryHandle, 1, path.join(path.abspath(ttsPath), "root.dic").encode('mbcs'))
 		params[ECIParam.eciLanguageDialect] = dll.eciGetParam(handle, ECIParam.eciLanguageDialect)
 		started.set()
 		while True:
@@ -225,7 +225,8 @@ def setLast(lp):
 	onIndexReached(lp)
 
 def bgPlay(stri):
-	if len(stri) == 0: return
+	global player
+	if not player or len(stri) == 0: return
 	# Sometimes player.feed() tries to open the device when it's already open,
 	# causing a WindowsError. This code catches and works around this.
 	# [DGL, 2012-12-18 with help from Tyler]
@@ -236,6 +237,10 @@ def bgPlay(stri):
 			if tries > 0:
 				log.warning("Eloq speech retries: %d" % (tries))
 			return
+		except FileNotFoundError:
+			# reset the player if the used soundcard is not present. E.G. the total number of sound devices has changed.
+			player.close()
+			player = nvwave.WavePlayer(1, 11025, 16, outputDevice=config.conf["speech"]["outputDevice"])
 		except:
 			player.idle()
 			time.sleep(0.02)
