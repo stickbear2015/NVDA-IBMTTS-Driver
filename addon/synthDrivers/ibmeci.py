@@ -23,24 +23,25 @@ try: # for python 2.7
 except:
 	from driverHandler import BooleanDriverSetting,NumericDriverSetting
 	from synthDriverHandler import synthIndexReached, synthDoneSpeaking
-	def unicode(s):
-		return s
+	def unicode(s): return s
 
-
-punctuation = "-,.?!:;"
 minRate=40
 maxRate=156
-
-pause_re = re.compile(br'([a-zA-Z])([-.(),:;!?])( |$)')
+punctuation = b"-,.:;)(?!"
+pause_re = re.compile(br'([a-zA-Z])([%s])( |$)' %punctuation)
 time_re = re.compile(br"(\d):(\d+):(\d+)")
 
 anticrash_res = {
-	re.compile(br'\b(|\d+|\W+)(|un|anti|re)c(ae|\xe6)sur', re.I): br'\1\2seizur',
+	re.compile(br'\b(|\d+|\W+)?(|un|anti|re)c(ae|\xe6)sur', re.I): br'\1\2seizur',
 	re.compile(br"\b(|\d+|\W+)h'(r|v)[e]", re.I): br"\1h ' \2 e",
-	# re.compile(r"\b(|\d+|\W+)wed[h]esday", re.I): r"\1wed hesday",
-	re.compile(br'hesday'): b' hesday',
-	re.compile(br"\b(|\d+|\W+)tz[s]che", re.I): br"\1tz sche"
-}
+	re.compile(br"\b(\w+[bdflmnrvzqh])hes([bcdfgjklmnprtw]\w+)\b", re.I): br"\1 hes\2",
+	re.compile(br"(\d):(\d\d[snrt][tdh])", re.I): br"\1 \2",
+	re.compile(br"h'([bdfjkpstvx']+)'([rtv][aeiou]?)", re.I): br"h \1 \2",
+	re.compile(br"(re|un|non|anti)cosp", re.I): br"\1kosp",
+	re.compile(br"(anti|non|re|un)caesure", re.I): br"\1ceasure",
+	re.compile(br"(EUR[A-Z]+)(\d+)", re.I): br"\1 \2",
+	re.compile(br"\b(|\d+|\W+)?t+z[s]che", re.I): br"\1tz sche"
+	}
 
 english_fixes = {
 	re.compile(r'(\w+)\.([a-zA-Z]+)'): r'\1 dot \2',
@@ -171,7 +172,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				outlist.append((_ibmeci.setProsodyParam, (self.PROSODY_ATTRS[type(item)], val)))
 			else:
 				log.error("Unknown speech: %s"%item)
-		if last is not None and not str(last[-1]) in punctuation: outlist.append((_ibmeci.speak, (b'`p1. ',)))
+		if last is not None and last[-1] not in punctuation: outlist.append((_ibmeci.speak, (b'`p1. ',)))
 		outlist.append((_ibmeci.setEndStringMark, ()))
 		outlist.append((_ibmeci.synth, ()))
 		_ibmeci.eciQueue.put(outlist)
@@ -197,7 +198,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		text = pause_re.sub(br'\1 `p1\2\3', text)
 		text = time_re.sub(br'\1:\2 \3', text)
 		return text
-
 
 	def pause(self,switch):
 		_ibmeci.pause(switch)
@@ -292,7 +292,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return str(_ibmeci.params[_ibmeci.ECIParam.eciLanguageDialect])
 	def _set_voice(self,vl):
 		_ibmeci.set_voice(vl)
-	
+
 	def _get_lastIndex(self):
 		#fix?
 		return _ibmeci.lastindex
