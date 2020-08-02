@@ -34,3 +34,12 @@
 * cuando utilice el botón "Copiar archivos IBMTTS en un add-on", creará un nuevo add-on en NVDA. Por lo tanto, si desea desinstalar IBMTTS, necesitará desinstalar dos complementos: "Controlador de IBMTTS" y "Eci libraries".
 * Las herramientas scons y gettext de este proyecto son compatibles con python 3 únicamente. No funcionan en python 2.7.
 * Puede agregar  los archivos extra requeridos de IBMTTS dentro del complemento (para uso personal solamente). Simplemente cópielos dentro de "addon\synthDrivers\ibmtts". Ajuste el nombre de la librería por defecto en "settingsDB.py" si es necesario.
+
+#Referencias.
+ Este controlador está basado en el SDK de Viavoice de IBM (IBMTTS) disponible en [Este enlace](http://www.wizzardsoftware.com/docs/tts.pdf)
+
+o puede encontrar una copia en [este repositorio](https://github.com/david-acm/NVDA-IBMTTS-Driver)
+
+Vea los archivos
+[tts.pdf](https://cdn.jsdelivr.net/gh/david-acm/NVDA-IBMTTS-Driver/apiReference/tts.pdf)
+o [tts.txt.](https://cdn.jsdelivr.net/gh/david-acm/NVDA-IBMTTS-Driver/apiReference/tts.txt)

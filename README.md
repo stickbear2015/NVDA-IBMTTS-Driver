@@ -3,6 +3,9 @@
   We can not distribute the IBMTTS libraries. So it is just the driver.
   If you want to improve this driver, feel free to send your pull requests!
 
+# Download.
+The latest release is available to [download in this link](https://davidacm.github.io/getlatest/gh/davidacm/NVDA-IBMTTS-Driver)
+
 # Features:
 * Voice, variant, rate, pitch, inflection and volume  setting support.
 * Extra head size, Roughness, Breathiness parameters settings support. Create your own voice!
@@ -32,3 +35,13 @@
 * when you use the "Copy IBMTTS files in an  add-on" button, it will create a new add-on. So, if you want to uninstall IBMTTS, you'll need to uninstall two add-ons: "IBMTTS driver" and "Eci libraries".
 * scons and gettext tools on this project are  compatible with python 3 only. Doesn't work with python 2.7.
 * You can put the extra IBMTTS required files in the add-on (for personal use only). Just copy them in "addon\synthDrivers\ibmtts" folder. Adjust the default library name in "settingsDB.py" if necessary.
+
+# References.
+This driver is based on the IBM tts sdk, the documentation is available on:
+[this link](http://www.wizzardsoftware.com/docs/tts.pdf)
+
+Or you can get a copy on [this repo](https://github.com/david-acm/NVDA-IBMTTS-Driver)
+
+See the files
+[tts.pdf](https://cdn.jsdelivr.net/gh/davidacm/NVDA-IBMTTS-Driver/apiReference/tts.pdf)
+or [tts.txt.](https://cdn.jsdelivr.net/gh/davidacm/NVDA-IBMTTS-Driver/apiReference/tts.txt)

@@ -27,21 +27,22 @@ except:
 	def unicode(s): return s
 
 minRate=40
-maxRate=156
-punctuation = b"-,.:;)(?!"
-pause_re = re.compile(br'([a-zA-Z])([%s])( |$)' %punctuation)
+maxRate=150
+punctuation = b"-,.:;)(?!\x96\x97"
+pause_re = re.compile(br'([a-zA-Z0-9]|\s)([%s])(\2*?)(\s|$)' %punctuation)
 time_re = re.compile(br"(\d):(\d+):(\d+)")
 
 anticrash_res = {
-	re.compile(br'\b(|\d+|\W+)?(|un|anti|re)c(ae|\xe6)sur', re.I): br'\1\2seizur',
+	re.compile(br'\b(.*?)c(ae|\xe6)sur(e)?', re.I): br'\1seizur',
 	re.compile(br"\b(|\d+|\W+)h'(r|v)[e]", re.I): br"\1h ' \2 e",
-	re.compile(br"\b(\w+[bdflmnrvzqh])hes([bcdfgjklmnprtw]\w+)\b", re.I): br"\1 hes\2",
+	re.compile(br"\b(\w+[bdfhjlmnqrvz])(h[he]s)([bcdfgjklmnoprstw]\w+)\b", re.I): br"\1 \2\3",
 	re.compile(br"(\d):(\d\d[snrt][tdh])", re.I): br"\1 \2",
-	re.compile(br"h'([bdfjkpstvx']+)'([rtv][aeiou]?)", re.I): br"h \1 \2",
+	re.compile(br"\b([bcdfghjklmnpstvwxz]+)'([bcdfghjklmnpstvwxz']+)'([rtv][aeiou]?)", re.I): br"\1 \2 \3",
 	re.compile(br"(re|un|non|anti)cosp", re.I): br"\1kosp",
-	re.compile(br"(anti|non|re|un)caesure", re.I): br"\1ceasure",
+	#re.compile(br"(anti|non|re|un|ultra|mis|cyber|over|under)caesure", re.I): r"\1ceasure",
 	re.compile(br"(EUR[A-Z]+)(\d+)", re.I): br"\1 \2",
-	re.compile(br"\b(|\d+|\W+)?t+z[s]che", re.I): br"\1tz sche"
+	re.compile(br"\b(\d+|\W+|[bcdfghjklmnpqrstvwxz]+)?t+z[s]che", re.I): br"\1tz sche",
+	re.compile(br"\b(juar[aeou]s)([aeiou]{6,})", re.I): br"\1 \2"
 	}
 
 english_fixes = {
@@ -56,7 +57,13 @@ spanish_fixes = {
 	re.compile(r'([a-zA-Z0-9_]+)@(\w+)'): r'\1 arroba \2',
 	re.compile(u'([€$]\d{1,3})((\s\d{3})+\.\d{2})'): r'\1 \2',
 }
+german_fixes = {
+# Crash words.
+	re.compile(r'dane-ben', re.I): r'dane- ben',
+	re.compile(r'dage-gen', re.I): r'dage- gen',
+}
 
+# fixme: These are only the variant names for enu. Does ECI have a way to obtain names for other languages?
 variants = {
 	1:"Reed",
 	2:"Shelley",
@@ -104,7 +111,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		NumericDriverSetting("hsz", _("Head Size"), False),
 		NumericDriverSetting("rgh", _("Roughness"), False),
 		NumericDriverSetting("bth", _("Breathiness"), False),
-		BooleanDriverSetting("backquoteVoiceTags", _("Enable backquote voice &tags"), False))
+		BooleanDriverSetting("backquoteVoiceTags", _("Enable backquote voice &tags"), False),
+		BooleanDriverSetting("ABRDICT", _("Enable &abbreviation dictionary"), False),
+		BooleanDriverSetting("phrasePrediction", _("Enable Phrase Prediction"), False),
+		BooleanDriverSetting("shortpause", _("&Shorten Pauses"), False))
 	supportedCommands = {
 		speech.IndexCommand,
 		speech.CharacterModeCommand,
@@ -133,6 +143,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.rate=50
 		self.speakingLanguage=lang
 		self.variant="1"
+		self.currentEncoding = "mbcs"
 
 	PROSODY_ATTRS = {
 		speech.PitchCommand: ECIVoiceParam.eciPitchBaseline,
@@ -160,13 +171,14 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					if item.lang != self.speakingLanguage and item.lang != self.speakingLanguage[0:2]:
 						outlist.append((_ibmeci.speak, (l,)))
 						self.speakingLanguage=item.lang
+						self.updateEncoding(l)
 				else:
 					outlist.append((_ibmeci.speak, (langsAnnotations[defaultLanguage],)))
 					self.speakingLanguage = defaultLanguage
 			elif isinstance(item,speech.CharacterModeCommand):
 				outlist.append((_ibmeci.speak, (b"`ts1" if item.state else b"`ts0",)))
 			elif isinstance(item,speech.BreakCommand):
-				outlist.append((_ibmeci.speak, (b' `p%d ' %item.time,)))
+				outlist.append((_ibmeci.speak, (b' `p%d ' %item.time*3,)))
 			elif type(item) in self.PROSODY_ATTRS:
 				val = max(0, min(item.newValue, 100))
 				if type(item) == speech.RateCommand: val = self.percentToRate(val)
@@ -191,20 +203,27 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if _ibmeci.params[9] in (196609, 196608):
 			text = resub(french_fixes, text)
 			text = text.replace('quil', 'qil') #Sometimes this string make everything buggy with IBMTTS in French
-		if self._backquoteVoiceTags:
-			#this converts to ansi for anticrash. If this breaks with foreign langs, we can remove it.
-			text = text.replace('`', ' ').encode('mbcs', 'replace') #no embedded commands
-			text = b"`pp0 `vv%d %s" % (_ibmeci.getVParam(ECIVoiceParam.eciVolume), text)
-			text = resub(anticrash_res, text)
+		if  _ibmeci.params[9] in ('deu', 262144):
+			text = resub(german_fixes, text)
+		#this converts to ansi for anticrash. If this breaks with foreign langs, we can remove it.
+		text = text.encode(self.currentEncoding, 'replace') # special unicode symbols may encode to backquote. For this reason, backquote processing is after this.
+		if not self._backquoteVoiceTags:
+			text=text.replace(b'`', b' ') # no embedded commands
+		text = resub(anticrash_res, text)
+		if self._shortpause:
+			text = pause_re.sub(br'\1`p1\2\3\4', text) # this enforces short, JAWS-like pauses.
+		text = time_re.sub(br'\1:\2 \3', text) # apparently if this isn't done strings like 2:30:15 will only announce 2:30
+		embeds=b''
+		if self._ABRDICT:
+			embeds+=b"`da1 "
 		else:
-			#this converts to ansi for anticrash. If this breaks with foreign langs, we can remove it.
-			text = text.encode('mbcs', 'replace')
-			text = resub(anticrash_res, text)
-			text = b"`pp0 `vv%d %s" % (_ibmeci.getVParam(ECIVoiceParam.eciVolume), text.replace(b'`', b' ')) #no embedded commands
-		text = pause_re.sub(br'\1 `p1\2\3', text)
-		text = time_re.sub(br'\1:\2 \3', text)
+			embeds+=b"`da0 "
+		if self._phrasePrediction:
+			embeds+=b"`pp1 "
+		else:
+			embeds+=b"`pp0 "
+		text = b"`vv%d `vs%d %s %s" % (_ibmeci.getVParam(ECIVoiceParam.eciVolume), _ibmeci.getVParam(ECIVoiceParam.eciSpeed), embeds.rstrip(), text) # bring all the printf stuff into one call, in one string. This avoids all the concatonation and printf additions of the previous organization.
 		return text
-
 	def pause(self,switch):
 		_ibmeci.pause(switch)
 
@@ -212,6 +231,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		_ibmeci.terminate()
 
 	_backquoteVoiceTags=False
+	_ABRDICT=False
+	_phrasePrediction=False
+	_shortpause=False
 	def _get_backquoteVoiceTags(self):
 		return self._backquoteVoiceTags
 
@@ -219,7 +241,24 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if enable == self._backquoteVoiceTags:
 			return
 		self._backquoteVoiceTags = enable
-
+	def _get_ABRDICT(self):
+		return self._ABRDICT
+	def _set_ABRDICT(self, enable):
+		if enable == self._ABRDICT:
+			return
+		self._ABRDICT = enable
+	def _get_phrasePrediction(self):
+		return self._phrasePrediction
+	def _set_phrasePrediction(self, enable):
+		if enable == self._phrasePrediction:
+			return
+		self._phrasePrediction = enable
+	def _get_shortpause(self):
+		return self._shortpause
+	def _set_shortpause(self, enable):
+		if enable == self._shortpause:
+			return
+		self._shortpause = enable
 	_rateBoost = False
 	RATE_BOOST_MULTIPLIER = 1.6
 	def _get_rateBoost(self):
@@ -297,7 +336,19 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 	def _get_voice(self):
 		return str(_ibmeci.params[_ibmeci.ECIParam.eciLanguageDialect])
 	def _set_voice(self,vl):
-		_ibmeci.set_voice(vl)
+		_ibmeci.setVoice(int(vl))
+		self.updateEncoding(int(vl))
+
+	def updateEncoding(self, lang): # lang must be a number asociated with IBMTTS languages or a string with an annotation language.
+		# currently we don't need to consider the decimal part for the conversion.
+		if isinstance(lang, bytes): lang = int(float(lang[2:])) * 65536
+		#chinese
+		if lang == 393216: self.currentEncoding = "gb2312"
+		# japan
+		elif lang == 524288: self.currentEncoding = "cp932"
+		# korean
+		elif lang == 655360: self.currentEncoding = "cp949"
+		else: self.currentEncoding = "mbcs"
 
 	def _get_lastIndex(self):
 		#fix?
